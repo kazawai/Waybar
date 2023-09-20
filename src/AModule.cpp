@@ -1,7 +1,9 @@
 #include "AModule.hpp"
 
 #include <fmt/format.h>
+#include <spdlog/spdlog.h>
 
+#include <string>
 #include <util/command.hpp>
 
 namespace waybar {
@@ -25,6 +27,7 @@ AModule::AModule(const Json::Value& config, const std::string& name, const std::
     else
       spdlog::warn("Wrong actions section configuration. See config by index: {}", it.index());
   }
+
 
   // configure events' user commands
   // hasUserEvent is true if any element from eventMap_ is satisfying the condition in the lambda
@@ -85,6 +88,8 @@ bool AModule::handleToggle(GdkEventButton* const& e) { return handleUserEvent(e)
 bool AModule::handleRelease(GdkEventButton* const& e) { return handleUserEvent(e); }
 
 bool AModule::handleUserEvent(GdkEventButton* const& e) {
+  spdlog::info("Module {0}", name_);
+  spdlog::info("  event: {0}", std::to_string(e->type));
   std::string format{};
   const std::map<std::pair<uint, GdkEventType>, std::string>::const_iterator& rec{
       eventMap_.find(std::pair(e->button, e->type))};

@@ -45,6 +45,8 @@ class AModule : public IModule {
   gdouble distance_scrolled_y_;
   gdouble distance_scrolled_x_;
   std::map<std::string, std::string> eventActionMap_;
+
+ protected:
   static const inline std::map<std::pair<uint, GdkEventType>, std::string> eventMap_{
       {std::make_pair(1, GdkEventType::GDK_BUTTON_PRESS), "on-click"},
       {std::make_pair(1, GdkEventType::GDK_BUTTON_RELEASE), "on-click-release"},
