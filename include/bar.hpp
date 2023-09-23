@@ -102,6 +102,7 @@ class Bar {
   void onMap(GdkEventAny *);
   auto setupWidgets() -> void;
   void getModules(const Factory &, const std::string &, Gtk::Box *);
+  std::vector<waybar::AModule*> configureGroupModules(const Factory &, const std::string &);
   void setupAltFormatKeyForModule(const std::string &module_name);
   void setupAltFormatKeyForModuleList(const char *module_list_name);
   void setMode(const bar_mode &);

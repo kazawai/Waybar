@@ -1,3 +1,9 @@
+#include <spdlog/common.h>
+#include <algorithm>
+#include <string>
+#include <vector>
+#include "AModule.hpp"
+#include "gtkmm/widget.h"
 #ifdef HAVE_GTK_LAYER_SHELL
 #include <gtk-layer-shell.h>
 #endif
@@ -748,15 +754,18 @@ void waybar::Bar::getModules(const Factory& factory, const std::string& pos,
         auto ref = name.asString();
         AModule* module;
 
+        spdlog::info("Configuring module {}", ref);
+
         if (ref.compare(0, 6, "group/") == 0 && ref.size() > 6) {
           auto hash_pos = ref.find('#');
           auto id_name = ref.substr(6, hash_pos - 6);
+          spdlog::info("Configuring group module {}", id_name);
           auto class_name = hash_pos != std::string::npos ? ref.substr(hash_pos + 1) : "";
 
           auto parent = group ? group : &this->box_;
           auto vertical = parent->get_orientation() == Gtk::ORIENTATION_VERTICAL;
-          auto group_module = new waybar::Group(id_name, class_name, config[ref], vertical);
-          getModules(factory, ref, &group_module->box);
+          auto group_modules = configureGroupModules(factory, ref);
+          auto group_module = new waybar::Group(id_name, class_name, config[ref], vertical, group_modules);
           module = group_module;
         } else {
           module = factory.makeModule(ref);
@@ -768,12 +777,15 @@ void waybar::Bar::getModules(const Factory& factory, const std::string& pos,
           group->pack_start(*module, false, false);
         } else {
           if (pos == "modules-left") {
+            spdlog::info("Adding module {} to left", ref);
             modules_left_.emplace_back(module_sp);
           }
           if (pos == "modules-center") {
+            spdlog::info("Adding module {} to center", ref);
             modules_center_.emplace_back(module_sp);
           }
           if (pos == "modules-right") {
+            spdlog::info("Adding module {} to right", ref);
             modules_right_.emplace_back(module_sp);
           }
         }
@@ -789,6 +801,38 @@ void waybar::Bar::getModules(const Factory& factory, const std::string& pos,
       }
     }
   }
+}
+
+std::vector<waybar::AModule*> waybar::Bar::configureGroupModules(const Factory& factory, const std::string& pos){
+  auto module_list = config[pos]["modules"];
+  if(!module_list.isArray()) {
+    return {};
+  }
+  std::vector<AModule*> modules;
+  try{
+    for(const auto& name: module_list){
+      spdlog::info("Configuring group module {}", name.asString());
+      auto ref = name.asString();
+      AModule* module;
+
+      module = factory.makeModule(ref);
+      std::shared_ptr<AModule> module_sp(module);
+      modules_all_.emplace_back(module_sp);
+
+      modules.emplace_back(module);
+    }
+  }catch(const std::exception& e){
+    spdlog::warn("module {}: {}", pos, e.what());
+  }
+
+  // Log the modules in the group
+  std::string module_names;
+  for(const auto& module: modules){
+    module_names += module->getName() + " ";
+  }
+  spdlog::info("Group module {} contains modules: {}", pos, module_names);
+
+  return modules;
 }
 
 auto waybar::Bar::setupWidgets() -> void {

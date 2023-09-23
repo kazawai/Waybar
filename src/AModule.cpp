@@ -1,10 +1,13 @@
 #include "AModule.hpp"
 
 #include <fmt/format.h>
+#include <spdlog/common.h>
 #include <spdlog/spdlog.h>
 
 #include <string>
 #include <util/command.hpp>
+#include "gdkmm/device.h"
+#include "gtkmm/box.h"
 
 namespace waybar {
 
@@ -39,8 +42,8 @@ AModule::AModule(const Json::Value& config, const std::string& name, const std::
       }) != eventMap_.cend();
 
   if (enable_click || hasUserEvent) {
-    event_box_.add_events(Gdk::BUTTON_PRESS_MASK);
-    event_box_.signal_button_press_event().connect(sigc::mem_fun(*this, &AModule::handleToggle));
+      event_box_.add_events(Gdk::BUTTON_PRESS_MASK);
+      event_box_.signal_button_press_event().connect(sigc::mem_fun(*this, &AModule::handleToggle));
   }
 
   bool hasReleaseEvent =
@@ -53,6 +56,29 @@ AModule::AModule(const Json::Value& config, const std::string& name, const std::
     event_box_.add_events(Gdk::BUTTON_RELEASE_MASK);
     event_box_.signal_button_release_event().connect(sigc::mem_fun(*this, &AModule::handleRelease));
   }
+
+
+  bool hasHoverEvent = std::find_if(eventMap_.cbegin(), eventMap_.cend(), [&config](const auto& eventEntry) {
+    // True if there is any non-release type event
+    return eventEntry.first.second == GdkEventType::GDK_ENTER_NOTIFY &&
+           config[eventEntry.second].isString();
+  }) != eventMap_.cend();
+  if (hasHoverEvent) {
+    event_box_.add_events(Gdk::ENTER_NOTIFY_MASK);
+    event_box_.signal_enter_notify_event().connect(sigc::mem_fun(*this, &AModule::handleHover));
+  }
+
+  bool hasLeaveEvent = std::find_if(eventMap_.cbegin(), eventMap_.cend(), [&config](const auto& eventEntry) {
+    // True if there is any non-release type event
+    return eventEntry.first.second == GdkEventType::GDK_LEAVE_NOTIFY &&
+           config[eventEntry.second].isString();
+  }) != eventMap_.cend();
+  if (hasLeaveEvent) {
+    event_box_.add_events(Gdk::LEAVE_NOTIFY_MASK);
+    event_box_.signal_leave_notify_event().connect(sigc::mem_fun(*this, &AModule::handleLeave));
+  }
+
+
   if (config_["on-scroll-up"].isString() || config_["on-scroll-down"].isString() || enable_scroll) {
     event_box_.add_events(Gdk::SCROLL_MASK | Gdk::SMOOTH_SCROLL_MASK);
     event_box_.signal_scroll_event().connect(sigc::mem_fun(*this, &AModule::handleScroll));
@@ -87,6 +113,27 @@ bool AModule::handleToggle(GdkEventButton* const& e) { return handleUserEvent(e)
 
 bool AModule::handleRelease(GdkEventButton* const& e) { return handleUserEvent(e); }
 
+bool AModule::handleHover(GdkEventCrossing* const& e) { return handleMouseEvent(e); }
+
+bool AModule::handleLeave(GdkEventCrossing* const& e) { return handleMouseEvent(e); }
+
+bool AModule::handleMouseEvent(GdkEventCrossing* const& e) {
+  spdlog::info("Module {0}", name_);
+  spdlog::info("  event: {0}", std::to_string(e->type));
+  const std::map<std::pair<uint, GdkEventType>, std::string>::const_iterator& rec{
+      eventMap_.find(std::pair(10, e->type))};
+  if (rec != eventMap_.cend()) {
+    // First call module actions
+    this->AModule::doAction(rec->second);
+    // Second call user scripts
+    if (config_[rec->second].isString())
+      pid_.push_back(util::command::forkExec(config_[rec->second].asString()));
+  }
+
+  dp.emit();
+  return true;
+}
+
 bool AModule::handleUserEvent(GdkEventButton* const& e) {
   spdlog::info("Module {0}", name_);
   spdlog::info("  event: {0}", std::to_string(e->type));
@@ -112,6 +159,8 @@ bool AModule::handleUserEvent(GdkEventButton* const& e) {
   dp.emit();
   return true;
 }
+
+std::string AModule::getName() const { return name_; }
 
 AModule::SCROLL_DIR AModule::getScrollDir(GdkEventScroll* e) {
   // only affects up/down

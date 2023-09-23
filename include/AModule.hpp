@@ -4,8 +4,11 @@
 #include <glibmm/markup.h>
 #include <gtkmm/eventbox.h>
 #include <json/json.h>
+#include <string>
+#include <utility>
 
 #include "IModule.hpp"
+#include "gtkmm/box.h"
 
 namespace waybar {
 
@@ -16,6 +19,7 @@ class AModule : public IModule {
   virtual auto refresh(int) -> void{};
   operator Gtk::Widget &() override;
   auto doAction(const std::string &name) -> void override;
+  std::string getName() const;
 
   Glib::Dispatcher dp;
 
@@ -37,9 +41,12 @@ class AModule : public IModule {
   virtual bool handleToggle(GdkEventButton *const &ev);
   virtual bool handleScroll(GdkEventScroll *);
   virtual bool handleRelease(GdkEventButton *const &ev);
+  virtual bool handleHover(GdkEventCrossing *const &ev);
+  virtual bool handleLeave(GdkEventCrossing *const &ev);
 
  private:
   bool handleUserEvent(GdkEventButton *const &ev);
+  bool handleMouseEvent(GdkEventCrossing *const &ev);
 
   std::vector<int> pid_;
   gdouble distance_scrolled_y_;
@@ -67,7 +74,9 @@ class AModule : public IModule {
       {std::make_pair(9, GdkEventType::GDK_BUTTON_PRESS), "on-click-forward"},
       {std::make_pair(9, GdkEventType::GDK_BUTTON_RELEASE), "on-click-forward-release"},
       {std::make_pair(9, GdkEventType::GDK_2BUTTON_PRESS), "on-double-click-forward"},
-      {std::make_pair(9, GdkEventType::GDK_3BUTTON_PRESS), "on-triple-click-forward"}};
+      {std::make_pair(9, GdkEventType::GDK_3BUTTON_PRESS), "on-triple-click-forward"},
+      {std::make_pair(10, GdkEventType::GDK_ENTER_NOTIFY), "on-mouse-hover"},
+      {std::make_pair(10, GdkEventType::GDK_LEAVE_NOTIFY), "on-mouse-leave"}};
 };
 
 }  // namespace waybar
